@@ -2,12 +2,16 @@
 
 하이브리드 PQ(`X25519MLKEM768`)를 켠 TLS 서버 운영자가 "켰다"가 아니라 "실제로 쓰인다"를 확인하도록, 연결 로그와 서버 설정을 논문의 판정 규칙으로 진단합니다.
 
+- 바로 써 보기: https://whiteclover0542.github.io/pq-tls-negotiation-checker/ (로그인 없음)
+- 포트폴리오: https://whiteclover-portfolio.vercel.app/ 대표작 "App · 논문을 쓰는 도구"
 - 논문: [하이브리드 PQ 키 교환의 협상 함수: 실제 클라이언트와 서버 정책의 관측](https://github.com/whiteclover0542/pq-hybrid-downgrade/blob/main/docs/PAPER.md)
 - 쓰는 결과: §2.1 분류(PQ 누락 / 클라이언트 선호 고전 / PQ 미적용), 표 2 협상 함수 세 유형, 표 7·8 CVE-2026-2673 조건
 
+![첫 화면](screenshots/01-app-first-screen.png)
+
 ## 실행
 
-빌드나 설치가 필요 없습니다. `index.html`을 브라우저로 열면 됩니다. 서버, 비밀값, 환경 변수가 없고 입력은 브라우저 밖으로 나가지 않습니다.
+위 공개 URL을 열거나, 저장소를 받아 `index.html`을 브라우저로 열면 됩니다. 빌드나 설치가 필요 없습니다. 서버, 비밀값, 환경 변수가 없고 입력은 브라우저 밖으로 나가지 않습니다.
 
 ## 할 일 세 가지
 
@@ -28,6 +32,9 @@
 | `analyze.js` | 판정 로직(논문 규칙) |
 | `samples.js` | 논문 저장소 `docs/research/baselines/raw/v1.7/`의 실제 `s_client -trace` 로그 2개와 합성 C2 예시 1개 |
 | `check.js` | `node check.js`로 논문 표 2·7 결과가 그대로 나오는지 확인 |
+| `screenshots/` | 할 일 세 가지 실행 결과와 포트폴리오 연결 화면 |
+| `SUBMISSION_TEXT.md` / `.pdf` | 과제 제출문 (논문·사이트 설명, 확인 방법, AI와 나의 판단) |
+| `SUBMISSION.md` / `PROGRESS.md` | 과제 요구사항 원본 / 진행 기록 |
 
 ## 한계
 
