@@ -1,4 +1,4 @@
-# PROGRESS.md — WindowBlind 진행 상황
+# PROGRESS.md — pq-tls-negotiation-checker 진행 상황
 
 > 요구사항 원본은 [SUBMISSION.md](./SUBMISSION.md) 참고. 이 파일은 작업하면서 계속 갱신합니다.
 
