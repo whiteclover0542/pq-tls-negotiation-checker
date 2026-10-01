@@ -71,4 +71,5 @@
 
 _(작업 진행하면서 날짜와 함께 기록)_
 
-- (아직 없음)
+- 2026-10-01: 참고 논문을 `security-telemetry-loss` → `pq-hybrid-downgrade`로 변경 (SUBMISSION.md 참고 논문 섹션 갱신)
+- 2026-10-01: 앱 방향 확정 — 연결 로그 진단 + 서버 설정 점검. 첫 판(index.html, analyze.js, samples.js, check.js, README.md) 제작, `node check.js` 통과, 375px 폭 확인

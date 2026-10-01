@@ -1,0 +1,195 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>PQ 협상 점검기</title>
+<meta name="description" content="하이브리드 PQ를 켠 TLS 서버가 실제로 하이브리드로 협상되는지, 연결 로그와 서버 설정으로 진단합니다.">
+<style>
+:root {
+  --bg: #f7f7f5; --panel: #ffffff; --text: #1d1d1b; --muted: #5f5f5a; --line: #deded8;
+  --accent: #2f5bd3; --ok: #1f7a43; --ok-bg: #e7f4ec; --warn: #8a5a00; --warn-bg: #fdf3dc;
+  --bad: #b3261e; --bad-bg: #fbe9e7; --info: #3d4f6b; --info-bg: #eaeef5; --code: #f0f0ec;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #151614; --panel: #1e1f1c; --text: #ececea; --muted: #a3a39c; --line: #34352f;
+    --accent: #8aa8ff; --ok: #7fd3a0; --ok-bg: #1b3326; --warn: #f0c56a; --warn-bg: #3a2f14;
+    --bad: #ff9a90; --bad-bg: #3d1d1a; --info: #b5c4de; --info-bg: #23293a; --code: #262723;
+  }
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 16px/1.6 system-ui, -apple-system, "Segoe UI", "Malgun Gothic", sans-serif; }
+main { max-width: 860px; margin: 0 auto; padding: 32px 16px 64px; }
+header .paper { color: var(--muted); font-size: 14px; margin: 0 0 6px; }
+header .paper a { color: inherit; }
+h1 { font-size: 26px; line-height: 1.3; margin: 0 0 12px; }
+.lead { font-size: 18px; margin: 0 0 20px; }
+.tasks { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; padding: 0; margin: 0 0 28px; list-style: none; counter-reset: t; }
+.tasks li { background: var(--panel); border: 1px solid var(--line); border-radius: 10px; padding: 12px 14px; font-size: 15px; counter-increment: t; }
+.tasks li::before { content: counter(t); display: inline-grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; background: var(--accent); color: var(--bg); font-weight: 700; font-size: 13px; margin-right: 8px; }
+section { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; margin-bottom: 20px; }
+h2 { font-size: 20px; margin: 0 0 4px; }
+.sub { color: var(--muted); margin: 0 0 14px; font-size: 15px; }
+.row { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 10px; }
+button { font: inherit; font-size: 14px; border: 1px solid var(--line); background: var(--bg); color: var(--text); border-radius: 8px; padding: 7px 12px; cursor: pointer; }
+button:hover { border-color: var(--accent); }
+button:focus-visible, textarea:focus-visible, input:focus-visible, select:focus-visible, summary:focus-visible, a:focus-visible { outline: 3px solid var(--accent); outline-offset: 3px; }
+button.primary { background: var(--accent); color: var(--bg); border-color: var(--accent); font-weight: 600; padding: 9px 18px; }
+textarea, input, select { font: 13px/1.5 ui-monospace, Consolas, monospace; width: 100%; color: var(--text); background: var(--bg); border: 1px solid var(--line); border-radius: 8px; padding: 10px; }
+textarea { height: 200px; resize: vertical; }
+select, input { font-family: inherit; font-size: 15px; }
+label { display: block; font-size: 14px; color: var(--muted); margin-bottom: 4px; }
+.grid { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; margin-bottom: 12px; }
+.grid .wide { grid-column: 1 / -1; }
+details { font-size: 14px; color: var(--muted); margin: 0 0 12px; }
+details pre { white-space: pre-wrap; word-break: break-all; }
+code, pre { font-family: ui-monospace, Consolas, monospace; font-size: 13px; background: var(--code); border-radius: 4px; padding: 1px 4px; }
+pre { padding: 10px; overflow-x: auto; }
+.result { margin-top: 16px; border-radius: 10px; padding: 16px; border: 1px solid var(--line); }
+.result:empty { display: none; }
+.result h3 { margin: 0 0 8px; font-size: 18px; }
+.result.ok { background: var(--ok-bg); border-color: var(--ok); } .result.ok h3 { color: var(--ok); }
+.result.warn { background: var(--warn-bg); border-color: var(--warn); } .result.warn h3 { color: var(--warn); }
+.result.bad { background: var(--bad-bg); border-color: var(--bad); } .result.bad h3 { color: var(--bad); }
+.result.info, .result.error { background: var(--info-bg); border-color: var(--info); } .result.info h3, .result.error h3 { color: var(--info); }
+.result ul { margin: 6px 0; padding-left: 20px; }
+.result .k { font-weight: 600; margin-top: 10px; }
+table { border-collapse: collapse; width: 100%; font-size: 14px; margin-top: 6px; }
+th, td { text-align: left; border-bottom: 1px solid var(--line); padding: 6px 8px; vertical-align: top; }
+th { color: var(--muted); font-weight: 600; }
+footer { color: var(--muted); font-size: 14px; }
+footer a { color: var(--accent); }
+@media (max-width: 640px) {
+  .tasks, .grid { grid-template-columns: 1fr; }
+  h1 { font-size: 22px; }
+}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <p class="paper">논문 · <a href="https://github.com/whiteclover0542/pq-hybrid-downgrade/blob/main/docs/PAPER.md">하이브리드 PQ 키 교환의 협상 함수: 실제 클라이언트와 서버 정책의 관측</a></p>
+  <h1>PQ 협상 점검기</h1>
+  <p class="lead">이 앱은 하이브리드 PQ(<code>X25519MLKEM768</code>)를 켠 TLS 서버 운영자가 <b>"켰다"가 아니라 "실제로 쓰인다"</b>를 확인하도록, 연결 로그와 서버 설정을 논문의 판정 규칙으로 진단해 줍니다.</p>
+  <ol class="tasks">
+    <li>예시 로그를 눌러 진단 결과가 어떻게 나오는지 본다</li>
+    <li>내 서버에 접속한 <code>-trace</code> 로그를 붙여 넣어 진단한다</li>
+    <li>서버 그룹 설정과 버전으로 C2·CVE 위험을 점검한다</li>
+  </ol>
+</header>
+
+<section id="log">
+  <h2>연결 로그 진단</h2>
+  <p class="sub">광고한 그룹, 먼저 보낸 key share, HRR, 최종 그룹을 뽑아 "하이브리드 / PQ 누락 / 클라이언트 선호 고전 / PQ 미적용"으로 분류합니다. 도구는 이 판정을 스스로 경고하지 않습니다(논문 §6.5).</p>
+  <div class="row" id="samples"></div>
+  <details>
+    <summary>내 서버 로그 받는 법 (OpenSSL 3.5 이상 클라이언트)</summary>
+    <p>세 유형으로 각각 접속해 보면 서버의 협상 함수를 알 수 있습니다. <code>호스트</code>를 바꾸세요.</p>
+<pre># C1 하이브리드 우선 + 하이브리드 key share
+openssl s_client -connect 호스트:443 -groups '*X25519MLKEM768:X25519' -trace &lt;/dev/null
+# C2 하이브리드 우선 + X25519 key share만 (논문에서 PQ 누락이 난 조건)
+openssl s_client -connect 호스트:443 -groups 'X25519MLKEM768:*X25519' -trace &lt;/dev/null
+# C3 고전 우선
+openssl s_client -connect 호스트:443 -groups '*X25519:X25519MLKEM768' -trace &lt;/dev/null</pre>
+  </details>
+  <form id="logForm">
+    <label for="logText">s_client -trace 출력</label>
+    <textarea id="logText" spellcheck="false" placeholder="여기에 openssl s_client ... -trace 출력 전체를 붙여 넣으세요"></textarea>
+    <div class="row" style="margin-top:10px"><button class="primary" id="logBtn" type="submit">진단</button></div>
+    <div class="result" id="logOut" aria-live="polite"></div>
+  </form>
+</section>
+
+<section id="config">
+  <h2>서버 설정 점검</h2>
+  <p class="sub">서버 구현과 그룹 설정으로, 세 유형의 클라이언트가 무엇을 받게 될지 논문 표 2·표 7 기준으로 예측합니다.</p>
+  <div class="row" id="cfgSamples"></div>
+  <form id="cfgForm">
+    <div class="grid">
+      <div><label for="impl">서버 구현</label>
+        <select id="impl">
+          <option value="openssl">OpenSSL (nginx, Apache, HAProxy 등)</option>
+          <option value="nss">NSS</option>
+          <option value="boringssl">BoringSSL</option>
+          <option value="rustls">rustls</option>
+          <option value="go">Go crypto/tls (Caddy 등)</option>
+        </select></div>
+      <div><label for="ver">OpenSSL 버전 (<code>openssl version</code>)</label><input id="ver" placeholder="예: 3.5.5"></div>
+      <div class="wide"><label for="groups">그룹 설정 (<code>Groups</code>, <code>ssl_ecdh_curve</code>, <code>-groups</code>) · 비우면 기본값</label><input id="groups" placeholder="예: X25519MLKEM768:X25519"></div>
+    </div>
+    <div class="row"><button class="primary" id="cfgBtn" type="submit">점검</button></div>
+    <div class="result" id="cfgOut" aria-live="polite"></div>
+  </form>
+</section>
+
+<footer>
+  <p>모든 판정은 이 브라우저 안에서만 실행되며 입력은 어디에도 전송되지 않습니다.</p>
+  <p>판정 규칙은 논문이 시험한 구현·버전(OpenSSL 3.5–3.6, NSS 3.120, BoringSSL, rustls 0.23.45, Go 1.26)에 근거합니다. 그 밖은 [추정]으로 표시합니다. 논문은 기본 설정 클라이언트 16개에서 C2를 찾지 못했으므로, 이 점검은 "자주 터지는 문제"보다 "켰다고 믿는 설정이 실제로 쓰이는지"를 확인하는 용도입니다.</p>
+  <p><a href="https://github.com/whiteclover0542/pq-hybrid-downgrade">논문 저장소</a> · <a href="https://github.com/whiteclover0542/WindowBlind">이 앱 소스</a></p>
+</footer>
+</main>
+
+<script src="analyze.js"></script>
+<script src="samples.js"></script>
+<script>
+function el(tag, text, cls) { var e = document.createElement(tag); if (text != null) e.textContent = text; if (cls) e.className = cls; return e; }
+function list(title, items, box) {
+  if (!items || !items.length) return;
+  box.appendChild(el('div', title, 'k'));
+  var ul = el('ul'); items.forEach(function (t) { ul.appendChild(el('li', t)); }); box.appendChild(ul);
+}
+function render(box, r) {
+  box.className = 'result ' + r.level; box.textContent = '';
+  box.appendChild(el('h3', r.title));
+  if (r.facts) {
+    var f = r.facts, t = el('table');
+    [['클라이언트 광고 순서', f.advertised.join(' → ') || '(없음)'],
+     ['초기 key share', f.keyShares.join(', ') || '(없음)'],
+     ['HRR', f.hrr ? '있음' : '없음'],
+     ['최종 그룹', f.negotiated || '(없음)'],
+     ['서버가 보낸 지원 목록', f.serverGroups ? f.serverGroups.join(' → ') : '(안 보냄: 서버 1순위로 협상했거나 로그에 없음)']
+    ].forEach(function (row) { var tr = el('tr'); tr.appendChild(el('th', row[0])); tr.appendChild(el('td', row[1])); t.appendChild(tr); });
+    box.appendChild(t);
+  }
+  if (r.predictions) {
+    box.appendChild(el('div', '예상 결과 · 선택 유형: ' + r.type, 'k'));
+    var p = el('table'), h = el('tr');
+    ['C1 하이브리드 우선 + 하이브리드 share', 'C2 하이브리드 우선 + X25519 share만', 'C3 고전 우선'].forEach(function (x) { h.appendChild(el('th', x)); });
+    var d = el('tr'); r.predictions.forEach(function (x) { d.appendChild(el('td', x)); });
+    p.appendChild(h); p.appendChild(d); box.appendChild(p);
+  }
+  list('근거', r.reasons, box);
+  list('할 일', r.advice, box);
+}
+function safe(box, fn) {
+  try { render(box, fn()); }
+  catch (e) { render(box, { level: 'error', title: '입력을 해석하지 못했습니다', reasons: [String(e && e.message || e)], advice: ['입력을 확인하고 다시 시도하세요.'] }); }
+}
+
+var logText = document.getElementById('logText'), logOut = document.getElementById('logOut');
+function runLog() { safe(logOut, function () { return analyzeLog(logText.value); }); }
+document.getElementById('logForm').onsubmit = function (event) { event.preventDefault(); runLog(); };
+SAMPLES.forEach(function (s) {
+  var b = el('button', s.label); b.type = 'button'; b.title = '출처: ' + s.source;
+  b.onclick = function () { logText.value = s.text; runLog(); };
+  document.getElementById('samples').appendChild(b);
+});
+
+var impl = document.getElementById('impl'), ver = document.getElementById('ver'), groups = document.getElementById('groups'), cfgOut = document.getElementById('cfgOut');
+function syncImpl() { ver.disabled = groups.disabled = impl.value !== 'openssl'; }
+function runCfg() { safe(cfgOut, function () { return analyzeConfig({ impl: impl.value, version: ver.value, groups: groups.value }); }); }
+impl.onchange = function () { syncImpl(); runCfg(); };
+document.getElementById('cfgForm').onsubmit = function (event) { event.preventDefault(); runCfg(); };
+[['S1 단일 tuple · 3.5.6', '3.5.6', 'X25519MLKEM768:X25519'],
+ ['S2 tuple 경계 · 3.5.6', '3.5.6', 'X25519MLKEM768/X25519'],
+ ['S3 DEFAULT · 3.5.5 (CVE)', '3.5.5', 'DEFAULT'],
+ ['S3 DEFAULT · 3.5.6 (수정)', '3.5.6', 'DEFAULT']
+].forEach(function (s) {
+  var b = el('button', s[0]); b.type = 'button';
+  b.onclick = function () { impl.value = 'openssl'; syncImpl(); ver.value = s[1]; groups.value = s[2]; runCfg(); };
+  document.getElementById('cfgSamples').appendChild(b);
+});
+</script>
+</body>
+</html>
